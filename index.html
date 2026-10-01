@@ -316,15 +316,18 @@
         history.unshift(move);history=history.slice(0,4);renderHistory();
         if(voiceOn&&canSpeak){window.speechSynthesis.cancel();const speech=new SpeechSynthesisUtterance(`${move.limb.name} on ${move.color.name.toLowerCase()}`);speech.lang='en-US';speech.rate=.92;window.speechSynthesis.speak(speech);}
       }
-      function spin(){
+      function spin(direction){
         if(spinning)return;
+        const dir=direction===-1?-1:1; // 1 = clockwise, -1 = counter-clockwise
         spinning=true;if(canSpeak)window.speechSynthesis.cancel();
         $('wheel-hub').setAttribute('aria-disabled','true');$('result-card').classList.add('spinning');$('move-title').textContent='Spinning…';$('move-message').textContent='Wait for the wheel to stop.';$('result-color').style.display='none';setSymbol('spin',null);
         const move=segments[randomInt(segments.length)];
         const current=((rotation%360)+360)%360;
         const target=(360-move.angle)%360;
-        const delta=(target-current+360)%360;
-        rotation+=(reduceMotion.matches?0:5+randomInt(3))*360+delta;
+        // Land exactly on the chosen segment, travelling in the requested direction.
+        const delta=dir===1?(target-current+360)%360:(current-target+360)%360;
+        const fullTurns=reduceMotion.matches?0:5+randomInt(3);
+        rotation+=dir*(fullTurns*360+delta);
         const duration=reduceMotion.matches?150:3800;
         disc.style.transform=`rotate(${rotation}deg)`;
         setTimeout(()=>{spinning=false;$('wheel-hub').setAttribute('aria-disabled','false');try{showMove(move);}catch(e){$('result-card').classList.remove('spinning');}},duration+40);
@@ -334,12 +337,15 @@
       // Swipe / flick anywhere on the wheel to spin.
       (() => {
         const svg=$('spinner-svg');
-        let startX=0,startY=0,startT=0,tracking=false,moved=false;
+        let startX=0,startY=0,startT=0,tracking=false,moved=false,startDir=1;
         const SWIPE_DIST=38; // px of travel that counts as a swipe
         svg.style.touchAction='none';
         svg.addEventListener('pointerdown',e=>{
           if(spinning)return;
           tracking=true;moved=false;startX=e.clientX;startY=e.clientY;startT=e.timeStamp;
+          // Swipe starting on the left half spins counter-clockwise, right half clockwise.
+          const rect=svg.getBoundingClientRect();
+          startDir=e.clientX<rect.left+rect.width/2?-1:1;
         });
         svg.addEventListener('pointermove',e=>{
           if(!tracking)return;
@@ -351,7 +357,7 @@
           const dist=Math.hypot(e.clientX-startX,e.clientY-startY);
           const dt=e.timeStamp-startT;
           // A flick (fast) or a clear drag across the wheel counts as a swipe.
-          if(!spinning && (dist>=SWIPE_DIST || (moved && dt<400 && dist>15)))spin();
+          if(!spinning && (dist>=SWIPE_DIST || (moved && dt<400 && dist>15)))spin(startDir);
         }
         svg.addEventListener('pointerup',finish);
         svg.addEventListener('pointercancel',()=>{tracking=false;});
