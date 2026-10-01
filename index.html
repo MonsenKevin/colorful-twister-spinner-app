@@ -56,7 +56,14 @@
     .wheel-icon{stroke:#303631;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:.63}
     .wheel-pointer{filter:drop-shadow(0 2px 1px #282c2a25)}
     .wheel-hub{cursor:pointer}
-    .wheel-hub:hover .hub-main{fill:#383e38}
+    .wheel-hub .hub-main{transition:fill .15s,transform .12s;transform-origin:210px 210px}
+    .wheel-hub .hub-ring{transition:opacity .2s}
+    .wheel-hub .hub-pulse{transform-origin:210px 210px;transform-box:fill-box;animation:hub-breathe 2.2s ease-in-out infinite}
+    .wheel-hub:hover .hub-main{fill:#444c43;transform:scale(1.05)}
+    .wheel-hub:active .hub-main{fill:#262b26;transform:scale(.9)}
+    .wheel-hub:hover .hub-pulse{animation-play-state:paused;opacity:0}
+    .wheel-hub[aria-disabled="true"] .hub-pulse{animation-play-state:paused;opacity:0}
+    @keyframes hub-breathe{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.22);opacity:0}}
     .hub-label{font-family:var(--body);font-size:10.5px;font-weight:700;letter-spacing:.5px;fill:#fff;pointer-events:none}
     .wheel-hint{display:flex;align-items:center;justify-content:center;gap:7px;color:#93938a;font-size:11px;padding-top:6px}
     .wheel-hint svg{width:13px;height:13px}
@@ -214,14 +221,16 @@
               <circle cx="210" cy="210" r="194" fill="#fffefb" stroke="#dfddd3" stroke-width="1"/>
               <g id="wheel-disc"></g>
               <path class="wheel-pointer" d="m199 9 11 24 11-24c-7-3-15-3-22 0Z" fill="#303630"/>
+              <circle class="hub-pulse" cx="210" cy="210" r="44" fill="none" stroke="var(--purple)" stroke-width="3"/>
               <g class="wheel-hub" id="wheel-hub" role="button" aria-label="Spin the wheel" aria-keyshortcuts="Enter Space" tabindex="0" filter="url(#hub-shadow)">
-                <circle class="hub-main" cx="210" cy="210" r="38" fill="#303630"/>
-                <circle cx="210" cy="210" r="31" fill="none" stroke="#ffffff22"/>
-                <use class="hub-spin-icon" href="#icon-spin" x="200" y="188" width="20" height="20" style="color:#fff"/>
-                <text class="hub-label" x="210" y="231" text-anchor="middle">SPIN</text>
+                <circle class="hub-main" cx="210" cy="210" r="40" fill="#303630" stroke="var(--purple)" stroke-width="2.5"/>
+                <circle class="hub-ring" cx="210" cy="210" r="32" fill="none" stroke="#ffffff33" stroke-width="1.5" stroke-dasharray="4 5"/>
+                <use class="hub-spin-icon" href="#icon-spin" x="200" y="186" width="20" height="20" style="color:#fff"/>
+                <text class="hub-label" x="210" y="230" text-anchor="middle">SPIN</text>
               </g>
             </svg>
           </div>
+          <p class="wheel-hint"><svg aria-hidden="true"><use href="#icon-spin"/></svg>Tap the center or swipe the wheel to spin</p>
         </div>
       </section>
       <section class="game-bottom" aria-label="Current move, recent moves, and voice setting">
@@ -322,6 +331,31 @@
       }
       $('wheel-hub').addEventListener('click',spin);
       $('wheel-hub').addEventListener('keydown',e=>{if(e.key==='Enter'||e.code==='Space'){e.preventDefault();spin();}});
+      // Swipe / flick anywhere on the wheel to spin.
+      (() => {
+        const svg=$('spinner-svg');
+        let startX=0,startY=0,startT=0,tracking=false,moved=false;
+        const SWIPE_DIST=38; // px of travel that counts as a swipe
+        svg.style.touchAction='none';
+        svg.addEventListener('pointerdown',e=>{
+          if(spinning)return;
+          tracking=true;moved=false;startX=e.clientX;startY=e.clientY;startT=e.timeStamp;
+        });
+        svg.addEventListener('pointermove',e=>{
+          if(!tracking)return;
+          if(Math.hypot(e.clientX-startX,e.clientY-startY)>8)moved=true;
+        });
+        function finish(e){
+          if(!tracking)return;
+          tracking=false;
+          const dist=Math.hypot(e.clientX-startX,e.clientY-startY);
+          const dt=e.timeStamp-startT;
+          // A flick (fast) or a clear drag across the wheel counts as a swipe.
+          if(!spinning && (dist>=SWIPE_DIST || (moved && dt<400 && dist>15)))spin();
+        }
+        svg.addEventListener('pointerup',finish);
+        svg.addEventListener('pointercancel',()=>{tracking=false;});
+      })();
       $('clear-button').addEventListener('click',()=>{history=[];renderHistory();});
       document.addEventListener('visibilitychange',()=>{if(document.hidden&&canSpeak)window.speechSynthesis.cancel();});
     })();
